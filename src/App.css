@@ -1,6 +1,6 @@
 /* Background and container */
 .app-container {
-  background: url("/images/Predictive-Maintenance-1024x532.webp") no-repeat center center fixed;
+  background: url(./assets/images/Predictive-Maintenance-1024x532 - Copy.webp) no-repeat center center fixed;
   background-size: cover;
   min-height: 100vh;
   padding: 50px;
@@ -91,4 +91,19 @@ button:hover {
   font-weight: bold;
   margin-bottom: 15px;
   color: #00c8ff;
+}
+
+/* --- Loading Spinner Styles --- */
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  height: 100px;
+}
+
+.loading-spinner p {
+  margin-top: 10px;
+  font-size: 16px;
+  color: #555;
 }

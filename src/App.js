@@ -1,5 +1,29 @@
 import React, { useState } from "react";
-import { PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
+import "./App.css";
+import { Pie, Line } from "react-chartjs-2";
+import { ToastContainer, toast } from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css';
+import { ClipLoader } from "react-spinners";  // Import the spinner
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+} from "chart.js";
+
+ChartJS.register(
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement
+);
 
 function App() {
   const initialFormData = {
@@ -14,6 +38,8 @@ function App() {
 
   const [formData, setFormData] = useState(initialFormData);
   const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false); // To handle loading state
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -21,7 +47,7 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    setLoading(true); // Start spinner when request is sent
     try {
       const response = await fetch("https://predictive-backend.onrender.com/predict", {
         method: "POST",
@@ -29,96 +55,86 @@ function App() {
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
 
       const data = await response.json();
       setResult(data);
+      setHistory((prev) => [...prev, data]);
+      toast.success("Prediction successful! 🎯");
     } catch (error) {
       console.error("Fetch error:", error);
-      alert("Failed to fetch prediction. Check if Flask server is running and CORS is allowed.");
+      toast.error("Failed to fetch prediction ❌");
+    } finally {
+      setLoading(false); // Stop spinner when prediction is done
     }
   };
 
-  const COLORS = ["#00C49F", "#FF8042"]; // For pie chart colors
+  // Pie chart: failure type distribution
+  const failureCounts = history.reduce((acc, entry) => {
+    const type = entry.failure_type || "None";
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
 
-  const failureData = result ? [
-    { name: result.failure_type, value: 70 }, 
-    { name: "No Failure", value: 30 }
-  ] : [];
+  const pieData = {
+    labels: Object.keys(failureCounts),
+    datasets: [
+      {
+        data: Object.values(failureCounts),
+        backgroundColor: ["#ff6b6b", "#5f27cd", "#1dd1a1", "#54a0ff"],
+      },
+    ],
+  };
 
-  const rulData = result ? [
-    { name: "Remaining Life", value: result.predicted_rul }
-  ] : [];
+  // Line chart: RUL trend
+  const lineData = {
+    labels: history.map((_, idx) => `Prediction ${idx + 1}`),
+    datasets: [
+      {
+        label: "Predicted RUL",
+        data: history.map((entry) => entry.predicted_rul),
+        fill: false,
+        backgroundColor: "#1dd1a1",
+        borderColor: "#10ac84",
+      },
+    ],
+  };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundImage: "url('/images/Predictive-Maintenance-1024x532.webp')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        color: "#ffffff",
-        padding: "50px",
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "rgba(0, 0, 0, 0.7)",
-          padding: "40px",
-          maxWidth: "700px",
-          margin: "auto",
-          borderRadius: "15px",
-        }}
-      >
-        <h1 style={{ textAlign: "center", color: "#00ffff" }}>Predictive Maintenance For Machinery Using Machine Learning</h1>
+    <div className="app-container" style={{ 
+        backgroundImage: "url('/assets/images/Predictive-Maintenance-1024x532 - Copy.webp')", 
+        backgroundSize: "cover", 
+        backgroundPosition: "center", 
+        backgroundRepeat: "no-repeat", 
+        minHeight: "100vh" 
+      }}>
+      <div className="form-section" style={{ backgroundColor: "rgba(0, 0, 0, 0.7)", padding: "20px", borderRadius: "10px", maxWidth: "800px", margin: "auto" }}>
+        <h1 style={{ textAlign: "center", color: "#00ffff" }}>Predictive Maintenance</h1>
         <form onSubmit={handleSubmit}>
-          <div>
-            <label>Operational Setting 1:</label>
-            <input
-              type="number"
-              step="0.1"
-              name="op_setting_1"
-              value={formData.op_setting_1}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div>
-            <label>Operational Setting 2:</label>
-            <input
-              type="number"
-              step="0.1"
-              name="op_setting_2"
-              value={formData.op_setting_2}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div>
-            <label>Operational Setting 3:</label>
-            <input
-              type="number"
-              step="0.1"
-              name="op_setting_3"
-              value={formData.op_setting_3}
-              onChange={handleChange}
-              required
-            />
-          </div>
+          {/* Operational Settings */}
+          {[1, 2, 3].map((num) => (
+            <div key={`op_setting_${num}`}>
+              <label><b>Operational Setting {num}:</b></label>
+              <input
+                type="text"
+                name={`op_setting_${num}`}
+                value={formData[`op_setting_${num}`]}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          ))}
 
+          {/* Sensor Inputs */}
           {[...Array(21)].map((_, index) => {
-            const sensorName = `sensor_measurement_${index + 1}`;
+            const name = `sensor_measurement_${index + 1}`;
             return (
-              <div key={sensorName}>
-                <label>{`Sensor Measurement ${index + 1}:`}</label>
+              <div key={name}>
+                <label><b>Sensor Measurement {index + 1}:</b></label>
                 <input
-                  type="number"
-                  step="0.1"
-                  name={sensorName}
-                  value={formData[sensorName]}
+                  type="text"
+                  name={name}
+                  value={formData[name]}
                   onChange={handleChange}
                   required
                 />
@@ -126,76 +142,39 @@ function App() {
             );
           })}
 
-          <button
-            type="submit"
-            style={{
-              marginTop: "20px",
-              padding: "10px 20px",
-              backgroundColor: "#00ffff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
+          <button type="submit" style={{ padding: "10px 20px", backgroundColor: "#00ffff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", marginTop: "20px" }}>
             Predict
           </button>
         </form>
 
-        {result && (
-          <div style={{ marginTop: "30px", color: "#fff" }}>
-            <h2 style={{ textAlign: "center" }}>Prediction Result</h2>
-            <p style={{ fontSize: "20px" }}>
-              <strong>Failure Type:</strong> {result.failure_type}
-            </p>
-            <p style={{ fontSize: "20px" }}>
-              <strong>Predicted RUL:</strong> {result.predicted_rul}
-            </p>
+        {/* Show Spinner if loading */}
+        {loading && (
+          <div className="loading-spinner" style={{ textAlign: "center", marginTop: "20px" }}>
+            <ClipLoader color="#36d7b7" loading={loading} size={50} />
+            <p>Predicting...</p>
+          </div>
+        )}
 
-            {/* Visualizations Section */}
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", marginTop: "30px" }}>
-              
-              {/* Pie Chart for Failure Type */}
-              <div style={{ width: "300px", height: "300px" }}>
-                <h3 style={{ textAlign: "center", marginBottom: "10px" }}>Failure Analysis</h3>
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie
-                      data={failureData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label
-                    >
-                      {failureData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Bar Chart for RUL */}
-              <div style={{ width: "300px", height: "300px" }}>
-                <h3 style={{ textAlign: "center", marginBottom: "10px" }}>Remaining Useful Life</h3>
-                <ResponsiveContainer>
-                  <BarChart data={rulData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#00C49F" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-            </div>
+        {result && !loading && (
+          <div className="result" style={{ marginTop: "30px", color: "#fff" }}>
+            <h2>Prediction Result</h2>
+            <p><strong>Failure Type:</strong> {result.failure_type}</p>
+            <p><strong>Predicted RUL:</strong> {result.predicted_rul}</p>
           </div>
         )}
       </div>
+
+      {/* Visualization Section */}
+      <div className="charts-section" style={{ marginTop: "50px", color: "#fff" }}>
+        <h2>Failure Type Distribution</h2>
+        <Pie data={pieData} />
+
+        <h2>RUL Prediction Trend</h2>
+        <Line data={lineData} />
+      </div>
+
+      {/* Toast Notifications */}
+      <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar={false} />
     </div>
   );
 }
