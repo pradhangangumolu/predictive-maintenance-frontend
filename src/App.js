@@ -23,7 +23,7 @@ function App() {
     e.preventDefault();
 
     try {
-      const response = await fetch("https://predictive-backend.onrender.com", {
+      const response = await fetch("https://predictive-backend.onrender.com/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
